@@ -1,0 +1,135 @@
+
+Movie ( mID, title, year, director ) 
+English: There is a movie with ID number mID, a title, a release year, and a director. 
+
+Reviewer ( rID, name ) 
+English: The reviewer with ID number rID has a certain name. 
+
+Rating ( rID, mID, stars, ratingDate ) 
+English: The reviewer rID gave the movie mID a number of stars rating (1-5) on a certain ratingDate. 
+
+
+Q2: Find all years that have a movie that received a rating of 4 or 5, and sort them in increasing order.
+
+V1:
+select distinct year
+from Movie, Rating
+where Movie.mID=Rating.mID and stars>=4
+order by year;
+
+V2:
+
+select year
+from Movie
+where mID in (Select mID from Rating Where stars>=4)
+order by year;
+
+
+
+Q3: Find the titles of all movies that have no ratings. 
+
+select title
+from Movie
+where mID not in (select distinct mID from Rating);
+
+
+Q4: Some reviewers didn't provide a date with their rating. Find the names of all reviewers who have ratings with a NULL value for the date. 
+
+Version 1:
+select name
+from Reviewer
+where rID in (select rID from Rating where ratingDate is Null);
+
+Version 2:
+select name
+from Reviewer join Rating
+on Reviewer.rID=Rating.rID
+where ratingDate is null;
+
+
+Q5: Write a query to return the ratings data in a more readable format: reviewer name, movie title, stars, and ratingDate. Also, sort the data, first by reviewer name, then by movie title, and lastly by number of stars. 
+
+Version 1:
+select name, title, stars, ratingDate
+from (Reviewer join Rating using (rId)) join Movie using (mID)
+order by name, title, stars;
+
+Version 2:
+select name, title, stars, ratingDate
+from (Reviewer natural join Rating) natural join Movie
+order by name, title, stars;
+
+Version 3:
+select name, title, stars, ratingDate
+from (Reviewer join Rating on Reviewer.rId=Rating.rId) join Movie on Movie.mID=Rating.mId
+order by name, title, stars;
+
+Q6: For all cases where the same reviewer rated the same movie twice and gave it a higher rating the second time, return the reviewer's name and the title of the movie.
+
+Version 1:
+Select distinct name, title
+From Reviewer, Movie, Rating
+Where Movie.mID= Rating.mID and Rating.rID=Reviewer.rID and Rating.rID in
+(Select r1.rID 
+from Rating r1, Rating r2 
+Where r1.rID=r2.rID and r1.mID=r2.mID and r1. ratingDate<r2.ratingDate and r1.stars<r2.stars);
+
+Note: Why is the “distinct” needed? The subquery only returns one tuple (the reviewer meeting the specified condition with the first review (lowest star) to the left and the second review (the highest) to the right). 
+However, the cross product between R, M and RT returns that tuple two times.
+
+Version 2:
+select name, title
+from Reviewer join (
+select rID, mID
+from Rating r1 join Rating r2 using (rID,mID)
+where r1.stars<r2.stars and r1.ratingDate<r2.ratingDate)
+ using (rID) join 
+Movie using (mID);
+
+Version 3:
+select name, title
+from Reviewer natural join (select rID, mID
+from Rating r1 join Rating r2 using (rID,mID)
+where r1.stars<r2.stars and r1.ratingDate<r2.ratingDate)
+natural join Movie;
+
+
+Q7: For each movie that has at least one rating, find the highest number of stars that movie received. Return the movie title and number of stars. Sort by movie title. 
+
+Version 1: This version is to get those movies with more than 1 rating. 
+Even when the question asks for movies with at least one rating, this version works because all the movies in this case have at least two ratings. 
+
+Select title, max(stars)
+From Movie join
+(Select *
+From Rating
+Where mID in (Select mID
+From Rating
+Group by mID
+Having Count (rID)>1)) using (mID)
+Group by title
+Order by title;
+
+NOTE: I have to do the nested Select to get the mID in one step because there is no way to get the mID together with the other attributes of interest in Rating (e.g., stars) if one uses aggregation.
+If I aggregate by mID, the program will pick a random value of the other attributes to pair with mID. 
+
+Version 2: Because all the movies in the rating section have at least one rating (otherwise they will not be there), this version works too: 
+SELECT title, MAX(stars)
+FROM Movie
+JOIN Rating USING(mId)
+GROUP BY title
+ORDER BY title;
+
+Q8: List movie titles and average ratings, from highest-rated to lowest-rated. If two or more movies have the same average rating, list them in alphabetical order.
+
+select title, avg (stars)
+from Movie join Rating using (mID)
+group by title
+order by avg(stars) DESC, title;
+
+Q9: Find the names of all reviewers who have contributed three or more ratings. (As an extra challenge, try writing the query without HAVING or without COUNT.)
+
+select name
+from Reviewer join Rating using (rID)
+group by name
+having COUNT (*)>=3;
